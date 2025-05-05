@@ -1,0 +1,55 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%post
+    
+    cd ~
+    mkdir pip_cache
+    echo "Current Directory: $(pwd)"
+    TMPDIR=/root/pip_cache/
+    
+    apt-get update && apt-get install -y wget bzip2
+    
+    apt-get install -y \
+        mesa-utils \
+        x11-utils \
+        libegl1-mesa \
+        libopengl0 \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libfontconfig1 \
+        libxrender1 \
+        libdbus-1-3 \
+        libxkbcommon-x11-0 \
+        libxi6 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-xinerama0 \
+        libxcb-xinput0 \
+        libxcb-xfixes0 \
+        libxcb-shape0
+
+    # MINIFORGE_INSTALL_DIR="/opt/miniforge"
+    wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> $APPTAINER_ENVIRONMENT
+    echo "conda activate napari_container" >> $APPTAINER_ENVIRONMENT
+    
+    . /opt/conda/etc/profile.d/conda.sh
+    
+    conda create -n napari_container python=3.12 pyopengl=3.1.6 napari pyqt -y -c conda-forge
+    conda activate napari_container
+    pip install --cache-dir=/root/pip_cache/ napari-skimage
+    
+    
+    
+%environment
+    . /opt/conda/etc/profile.d/conda.sh
+    conda activate napari_container
+
+%runscript
+    exec bash -c 'source /opt/conda/etc/profile.d/conda.sh && conda activate napari_container && exec "$@"' bash "$@"
