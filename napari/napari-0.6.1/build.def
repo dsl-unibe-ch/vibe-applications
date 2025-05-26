@@ -27,7 +27,7 @@ From: rockylinux/rockylinux:9-minimal
     . /opt/conda/etc/profile.d/conda.sh
     
     # create environment for napari
-    conda create -n napari_container python=3.12 napari pyqt -y -c conda-forge
+    conda create -n napari_container python=3.12 napari=0.6.1 pyqt -y -c conda-forge
     conda activate napari_container
     pip install --cache-dir=/opt/pip_cache/ napari-skimage
 
