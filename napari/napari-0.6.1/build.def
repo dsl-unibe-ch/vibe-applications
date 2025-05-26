@@ -1,0 +1,45 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%post
+    
+    cd /opt
+    mkdir pip_cache
+    echo "Current Directory: $(pwd)"
+    
+    # install essential packages and rendering packages
+    microdnf -y install dnf
+    dnf install -y dnf-plugins-core
+    dnf config-manager --set-enabled crb
+    dnf -y update && dnf -y upgrade
+    dnf install -y epel-release
+    dnf install -y wget
+    dnf install -y xorg-x11-utils mesa-libEGL mesa-libGL glib2 fontconfig libXrender dbus-libs libglvnd-opengl libxkbcommon-x11 libXi xcb-util xcb-util-wm libxcb xcb-util-keysyms xcb-util-image xcb-util-renderutil libXfixes
+
+    # install miniforge in /opt
+    # for latest
+    # wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    MINIFORGE_VERSION=25.3.0-3
+    wget "https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh"
+    bash Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+    
+    # create environment for napari
+    conda create -n napari_container python=3.12 napari pyqt -y -c conda-forge
+    conda activate napari_container
+    pip install --cache-dir=/opt/pip_cache/ napari-skimage
+
+    # Cleanup temporary files
+    rm -f /root/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+
+%environment
+
+    export XDG_CACHE_HOME=${HOME}/.cache
+
+%runscript
+    
+    exec bash -c 'source /opt/conda/etc/profile.d/conda.sh && conda activate napari_container && exec "$@"' bash "$@"
