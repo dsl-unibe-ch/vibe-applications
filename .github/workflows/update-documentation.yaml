@@ -1,0 +1,29 @@
+---
+name: "Update vibe-documentation"
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+    paths:
+      - '**/README.md'
+
+jobs:
+  update-vibe-documentation:
+    name: "Update the vibe-documentation"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Trigger the container-update dispatch"
+        run: |
+          curl -qs \
+            --fail-with-body \
+            -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.VIBE_DOCUMENTATION_DISPATCH }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/dsl-unibe-ch/vibe-documentation/dispatches \
+            -d '{"event_type":"container-update"}'
