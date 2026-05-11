@@ -1,0 +1,67 @@
+Bootstrap: docker
+From: rockylinux:9-minimal
+
+%labels
+    Application cellprofiler
+    Category high-content 
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled epel
+    dnf install -y wget bash
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+    dnf install -y java-17-openjdk gcc
+  
+    # -------------------------
+    # Python tooling
+    # -------------------------
+
+    # install miniforge in /opt
+    MINIFORGE_VERSION=25.3.0-3
+    # wget into /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    conda env create -f /opt/cellprofiler_env.yaml -y
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh
+    conda clean -a -y
+    dnf clean all
+
+    # Make the launcher executable
+    chmod +x /opt/launchers/start_cellprofiler.sh
+
+%files
+    files/cellprofiler_env.yaml /opt/cellprofiler_env.yaml
+    launchers/start_cellprofiler.sh /opt/launchers/start_cellprofiler.sh
+
+%runscript
+    /opt/launchers/start_cellprofiler.sh "$@"

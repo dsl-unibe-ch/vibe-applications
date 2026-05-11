@@ -1,0 +1,11 @@
+name: qupath-extensions_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - scikit-image
+  - pytorch-gpu=2.5.1
+  - numpy
+  - pip
+  - pip:
+    - cellpose < 4.0

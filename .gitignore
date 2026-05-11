@@ -44,5 +44,19 @@ Temporary Items
 # End of https://www.toptal.com/developers/gitignore/api/macos
 .vscode/settings.json
 
-# Apptainer Images
+# Apptainer Container files
+## ApptainerImages
 **/*.sif
+
+## Apptainer container licenses
+*/*/files/licenses/*
+
+# Application specific excludes
+## Huygens installer
+huygens/*/files/installer/*
+
+## cryosparc installer
+cryosparc/*/files/installer/*
+
+# Temporal folder for experimental files
+**/temp/

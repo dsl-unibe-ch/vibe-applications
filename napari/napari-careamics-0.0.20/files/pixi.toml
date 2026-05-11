@@ -1,0 +1,36 @@
+[workspace]
+authors = ["Guillaume Witz <guillaume.witz@unibe.ch>"]
+channels = ["conda-forge"]
+name = "napari-careamics-0.0.20"
+platforms = ["linux-64"]
+
+[environments]
+napari-careamics-default = ["napari-careamics-default"]
+
+[feature.napari-careamics-default.system-requirements]
+cuda = "12.0"
+
+[tasks]
+
+[dependencies]
+
+[feature.napari-careamics-default.dependencies]
+cuda-version = "12.*"
+python = "3.12.*"
+pytorch-gpu = "<2.10"
+typer = "<0.21"
+napari = "*"
+pyqt = "*"
+scipy = "<=1.17.0"
+
+[feature.napari-careamics-default.pypi-dependencies]
+jupyterlab = "*"
+napari-skimage = "*"
+careamics-napari = "==0.0.20"
+ndevio = ">=0.9.0, <0.10"
+bioio-czi = "*"
+bioio-dv = "*"
+bioio-nd2 = "*"
+bioio-lif = "*"
+napari = { version = ">=0.6.6, <0.7", extras = ["all"] }
+careamics = ">=0.0.22, <0.0.23"

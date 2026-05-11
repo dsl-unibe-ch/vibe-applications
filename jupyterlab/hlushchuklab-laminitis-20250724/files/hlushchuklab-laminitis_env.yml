@@ -1,0 +1,5 @@
+name: hlushchuklab-laminitis_env
+channels:
+  - conda-forge
+dependencies:
+  - pip

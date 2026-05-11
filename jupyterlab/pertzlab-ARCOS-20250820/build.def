@@ -1,0 +1,90 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application jupyterlab python
+    Category image-processing
+    Area biology
+    Lab pertz
+
+%post
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget git
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    # Suppress warning tha hostname command missing from VirtualGL
+    dnf -y install hostname
+
+    # Install dependencies for firefox launcher
+    dnf install -y apptainer
+    # Create firefox shortcut
+    echo -e '#!/bin/bash\nIMAGE_DIR=$(dirname $APPTAINER_CONTAINER)\n\napptainer run $IMAGE_DIR/firefox-base-latest.sif $@' > /usr/local/bin/x-www-browser
+    chmod +x /usr/local/bin/x-www-browser
+
+    # -------------------------
+    # Python tooling
+    # -------------------------
+
+    # install miniforge in /opt
+    MINIFORGE_VERSION=25.3.0-3
+    # wget into /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    export CONDA_OVERRIDE_CUDA=12.3
+    conda env create -f /opt/pertzlab-ARCOS-20250820_env.yml
+    conda activate pertzlab-ARCOS-20250820_env
+    
+    # -------------------------
+    # Add execution permition to launcher and tests
+    # -------------------------
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh
+    dnf clean all
+    conda clean --all -y
+
+%files
+    files/pertzlab-ARCOS-20250820_env.yml /opt/pertzlab-ARCOS-20250820_env.yml
+    launchers/* /opt/launchers/
+    tests/* /opt/tests/
+
+%test
+    {{ test_command }}
+
+%arguments
+    test_command="true"
+
+%environment
+    export XLA_FLAGS="--xla_gpu_cuda_data_dir=/opt/conda/envs/pertzlab-ARCOS-20250820_env"
+
+%runscript
+    /opt/launchers/start_jupyterlab.sh "$@"

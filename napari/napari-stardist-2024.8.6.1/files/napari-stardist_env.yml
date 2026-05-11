@@ -1,0 +1,25 @@
+name: napari-stardist_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - tensorflow=2.17
+  - cudnn=8.9
+  - numpy<2
+  - napari=0.6.4
+  - pyqt
+  - napari-skimage
+  - jupyterlab
+  - pandas
+  - seaborn
+  - pip
+  - pip:
+    - stardist
+    - numpy==1.26
+    - gputools==0.2.15
+    - edt
+    - requests
+    - stardist-napari==2024.8.6.1
+    - scyjava==1.12.1
+    - pytest
+    - napari-bioio-reader==0.2.0

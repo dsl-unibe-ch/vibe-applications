@@ -1,0 +1,19 @@
+name: napari-base_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - napari=0.6.4
+  - pyqt
+  - napari-skimage
+  - napari-animation
+  - napari-threedee
+  - jupyterlab
+  - pandas
+  - seaborn
+  - pip
+  - pip:
+    - requests
+    - scyjava==1.12.1
+    - pytest
+    - napari-bioio-reader==0.2.0

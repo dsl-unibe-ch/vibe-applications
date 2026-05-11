@@ -1,0 +1,35 @@
+[workspace]
+channels = ["conda-forge"]
+name = "napari-convpaint-0.8.2"
+platforms = ["linux-64"]
+
+[environments]
+napari-convpaint-default = { features = ["napari-convpaint-default"], no-default-feature = true }
+
+[feature.napari-convpaint-default.system-requirements]
+cuda = "12.0"
+
+[feature.napari-convpaint-default.dependencies]
+python = "3.11.*"
+pytorch-gpu = "*"
+cuda-version = "12.3*"
+napari = "*"
+napari-convpaint = "0.8.2*"
+pyqt = "*"
+napari-skimage = "*"
+jupyterlab = "*"
+numpy = "*"
+pip = "*"
+fastfilters = "*"
+
+[feature.napari-convpaint-default]
+channels = ["conda-forge", "ilastik-forge"]
+
+[feature.napari-convpaint-default.pypi-dependencies]
+ndevio = "*"
+bioio-czi = "*"
+bioio-dv = "*"
+bioio-nd2 = "*"
+bioio-lif = "*"
+cellpose = "<4"
+ilastik-napari = "*"

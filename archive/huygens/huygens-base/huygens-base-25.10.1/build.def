@@ -1,0 +1,77 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application huygens 
+    Category denoising
+    Area biology
+    Default true
+   
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+    # NOTE: Using cuda-toolkit version 12.2 since higher versions seems to fail to be detected (the cuda-toolkit) by Huygens.
+    dnf -y install cuda-toolkit-12-2
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    # This suppress warning from VGL that hostname utils are missing.
+    dnf install -y hostname
+
+
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+    cd /opt
+    dnf -y install huygens-25.10.1-p3.x86_64.rpm
+
+
+    # execute rights for launchers
+    for file in /opt/launchers/*; do chmod +x $file; done
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+    rm -f /opt/huygens-25.10.1-p3.x86_64.rpm
+
+%files
+    files/installer/huygens-25.10.1-p3.x86_64.rpm /opt/huygens-25.10.1-p3.x86_64.rpm
+    launchers/* /opt/launchers/
+    launchers/* /opt/launchers/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_huygens.sh "$@"

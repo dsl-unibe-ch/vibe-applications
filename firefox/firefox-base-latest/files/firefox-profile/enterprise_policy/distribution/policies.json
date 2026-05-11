@@ -1,0 +1,57 @@
+{
+  "policies": {
+    "DisablePocket": true,
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DNSOverHTTPS": {
+      "Enabled": false
+    },
+    "CaptivePortal": false,
+    "NetworkPrediction": false,
+    "AutofillAddressEnabled": false,
+    "AutofillCreditCardEnabled": false,
+    "DisableFirefoxAccounts": true,
+    "DisplayMenuBar": true,
+    "NewTabPage": false,
+    "FirefoxHome": {
+      "Search": false,
+      "TopSites": false,
+      "SponsoredTopSites": false,
+      "Highlights": false,
+      "Pocket": false,
+      "Stories": false,
+      "SponsoredPocket": false,
+      "SponsoredStories": false,
+      "Snippets": false,
+      "Locked": false
+    },
+    "FirefoxSuggest": {
+      "WebSuggestions": false,
+      "SponsoredSuggestions": false,
+      "ImproveSuggest": false,
+      "Locked": true
+    },
+    "GenerativeAI": {
+      "Chatbot": false,
+      "LinkPreviews": false,
+      "TabGroups": false
+    },
+    "OfferToSaveLoginsDefault": false,
+    "PasswordManagerEnabled": false,
+    "SanitizeOnShutdown": true,
+    "SearchEngines": {
+      "Default": "DuckDuckGo"
+    },
+    "SearchSuggestEnabled": false,
+    "TranslateEnabled": false,
+    "UserMessaging": {
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "UrlbarInterventions": false,
+      "SkipOnboarding": true,
+      "MoreFromMozilla": false,
+      "FirefoxLabs": false,
+      "Locked": false
+    }
+  }
+}

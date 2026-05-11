@@ -1,0 +1,17 @@
+name: napari-nninteractive_env
+channels:
+  - conda-forge
+  - ilastik-forge
+dependencies:
+  - python=3.12
+  - napari
+  - pyqt
+  - napari-skimage
+  - jupyterlab
+  - pytorch-gpu=2.5.1
+  - numpy
+  - pip
+  - pip:
+    - scyjava==1.12.1
+    - napari-bioio-reader==0.2.0
+    - napari-nninteractive==1.0.6

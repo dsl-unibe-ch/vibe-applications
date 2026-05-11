@@ -1,0 +1,67 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application imod 
+    Category image-processing
+    Area biology
+    Default true
+
+%post
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget
+    dnf install -y tar file
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    dnf install -y tree nano
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    # install CUDA
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+    dnf -y install cuda-toolkit-12-2
+
+    # install imod
+    cd /opt
+    mkdir imod
+    cd /opt/imod
+    curl -L -O https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_5.1.7_RHEL8-64_CUDA12.0.sh
+    sh imod_5.1.7_RHEL8-64_CUDA12.0.sh -yes -dir /opt/imod
+
+    # install Java for Etomo
+    dnf install -y java-latest-openjdk 
+
+    # postinstallation setup
+    chmod +x /opt/imod/IMOD/IMOD-linux.sh
+    /opt/imod/IMOD/IMOD-linux.sh
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -f /opt/imod/imod_5.1.7_RHEL8-64_CUDA12.0.sh
+    dnf clean all
+
+%files
+    launchers/* /opt/launchers/
+
+%runscript
+    /opt/launchers/start_imod.sh

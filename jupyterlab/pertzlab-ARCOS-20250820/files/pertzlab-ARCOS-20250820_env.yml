@@ -1,0 +1,32 @@
+name: pertzlab-ARCOS-20250820_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.*
+  - jupyterlab
+  - napari=0.4.19
+  - pyqt
+  - numpy<2
+  - tensorflow=2.17
+  - gcc
+  - ocl-icd-system
+  - pip
+  - pip:
+      - numpy==1.26.*
+      - pandas==2.2.*
+      - joblib==1.4.*
+      - scikit-image==0.23.*
+      - pyclesperanto-prototype==0.24.*
+      - matplotlib==3.9.*
+      - scipy==1.13.*
+      - plotnine==0.13.*
+      - arcos4py >= 0.2.4
+      - stardist==0.9.*
+      - btrack==0.6.*
+      - mizani==0.11.*
+      - stardist-napari==2022.12.6
+      - napari-assistant==0.4.*
+      - napari-pyclesperanto-assistant==0.22.*
+      - napari-skimage-regionprops==0.10.*
+      - napari-segment-blobs-and-things-with-membranes==0.3.*
+      - arcos-gui >=0.1.3
