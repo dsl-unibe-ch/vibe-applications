@@ -1,0 +1,61 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application ilastik 
+    Category segmentation
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+    dnf install -y tar gzip bzip2
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    #download and install ilastik
+    wget -P /opt https://files.ilastik.org/ilastik-1.4.1.post1-gpu-Linux.tar.bz2
+    tar -C /opt -xjf /opt/ilastik-1.*-Linux.tar.bz2
+
+    chmod +x /opt/ilastik-1.*-Linux/run_ilastik.sh
+
+
+    # exexcute rights for launchers
+    chmod +x /opt/launchers/start_*.sh 
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm /opt/ilastik-1.*-Linux.tar.bz2
+    rm -f /opt/VirtualGL-*.rpm
+    dnf clean all
+
+%files
+    launchers/* /opt/launchers/
+
+%runscript
+    /opt/launchers/start_ilastik.sh "$@"

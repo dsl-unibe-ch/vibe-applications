@@ -1,0 +1,51 @@
+Bootstrap: docker
+From: rockylinux:9-minimal
+
+%labels
+    Application firefox
+    Category browser
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y wget
+
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # Firefox application
+    dnf install -y firefox
+
+    VERSION=$(firefox --version | awk '{print $3}')
+    echo "Version $VERSION" >> $SINGULARITY_LABELS
+
+    # execute rights for launchers and tests
+    chmod +x /opt/launchers/start_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+
+%files
+    files/firefox-profile/enterprise_policy/* /lib64/firefox/
+    launchers/* /opt/launchers/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_firefox.sh "$@"

@@ -1,0 +1,73 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application fiji 
+    Category image-processing
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+    # The following libraries are required for Fiji
+    dnf install -y libXrender fontconfig
+    dnf install -y unzip 
+    dnf install -y hostname
+    
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    cd /opt
+    wget https://downloads.imagej.net/fiji/latest/fiji-latest-linux64-jdk.zip
+    unzip fiji-latest-linux64-jdk.zip -d /opt/
+    ##### Update fiji #####
+    /opt/Fiji/fiji-linux-x64 --headless --update update
+    ##### Installing plugins sites example #####
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site IJPB-plugins http://sites.imagej.net/IJPB-plugins/
+
+    # Make the launcher executable
+    chmod +x /opt/launchers/start_*.sh
+
+    # execute rights for launchers
+    for file in /opt/launchers/*; do chmod +x $file; done
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -f /opt/VirtualGL-*.rpm
+    dnf clean all
+    rm /opt/fiji-latest-linux64-jdk.zip
+
+%environment
+    FIJIPATH=/opt/Fiji
+    export PATH=$FIJIPATH:$PATH
+
+%files
+    launchers/* /opt/launchers/
+
+%runscript
+    /opt/launchers/start_fiji.sh "$@"

@@ -1,0 +1,27 @@
+name: meisterlab-pointanalysis_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - jupyterlab
+  - ipykernel
+  - scikit-image
+  - pandas
+  - matplotlib
+  - matplotlib-scalebar
+  - trackpy 
+  - napari
+  - pyqt
+  - pip
+  - seaborn
+  - pip:
+      - bioio
+      - bioio-nd2
+      - bioio-tifffile
+      - bioio-ome-tiff
+      - "cellpose<4"
+      - tqdm
+      - edt
+      - plotly
+      - ipywidgets
+      - networkx==3.5

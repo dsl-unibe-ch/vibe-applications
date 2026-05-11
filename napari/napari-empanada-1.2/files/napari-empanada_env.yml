@@ -1,0 +1,11 @@
+name: napari-empanada_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9 # dependency pinned!
+  - pip
+  - pyqt
+  - napari
+  - jupyterlab
+  - pip:
+    - empanada-napari

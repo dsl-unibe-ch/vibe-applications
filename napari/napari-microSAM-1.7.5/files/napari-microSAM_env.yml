@@ -1,0 +1,12 @@
+name: napari-microSAM_env
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - pyqt
+  - napari
+  - micro_sam
+  - jupyterlab
+  - pip:
+    - trackastra
+    - git+https://github.com/ChaoningZhang/MobileSAM.git

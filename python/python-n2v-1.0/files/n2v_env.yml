@@ -1,0 +1,12 @@
+name: n2v_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - tensorflow=2.10.0=cuda112py310he87a039_0
+  - scikit-image
+  - jupyterlab
+  - pip
+  - pip:
+      - typing-extensions
+      - n2v
