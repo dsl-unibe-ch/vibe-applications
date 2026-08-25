@@ -8,6 +8,6 @@ authors:
     given-names: "Ruben Jose"
     orcid: "https://orcid.org/0000-0002-3802-3158"
 title: "Application Containers for the VIBE Desktop"
-version: 1.0.0
-date-released: 2026-05-12
+version: v20260615
+date-released: 2026-06-15
 url: "https://github.com/dsl-unibe-ch/vibe-applications" 
