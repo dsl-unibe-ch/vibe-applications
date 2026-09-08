@@ -1,0 +1,219 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application relion reliontomo cli
+    Category image-processing cryoEM
+    Area biology
+    Default true
+
+%arguments
+    IMOD_VERSION=5.1.10
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget hostname
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+    dnf -y install cuda-toolkit-12-8
+    # Deps required for relion build
+    dnf -y install tar perl cmake git gcc gcc-c++ fftw-devel libtiff-devel libpng-devel ghostscript libXft-devel libX11-devel
+    # deps required for imod
+    dnf install -y file
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    dnf -y install emacs nano tree nano
+    # adding pdf viewer for relion gui
+    dnf -y install evince
+
+    # -------------------------
+    # donwload and install open-mpi
+    # -------------------------
+    dnf -y install openmpi openmpi-devel
+    PATH="/usr/lib64/openmpi/bin:$PATH"
+
+    # -------------------------
+    # Download & entraxt RELION
+    # -------------------------
+    cd /opt
+    git clone -b ver5.0 --single-branch https://github.com/3dem/relion.git
+
+    # -------------------------
+    # Python tooling
+    # -------------------------
+
+    # install miniforge in /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    # -------------------------
+    # Setup a conda environment
+    # -------------------------
+    export CONDA_OVERRIDE_CUDA=12.6
+    conda env create -f /opt/relion-base-5.0_env.yml
+    conda env update --name relion-base-5.0_env --file /opt/relion/environment.yml
+
+    # -------------------------
+    # Relion Compilation
+    # -------------------------
+    cd /opt/relion/build
+    cmake ..
+    make -j $(nproc)
+
+    # -------------------------
+    # Install ctffind4 and wxWidgets
+    # -------------------------
+    mkdir -p /opt/ctffind
+    curl -L http://grigoriefflab.umassmed.edu/sites/default/files/ctffind-4.1.14-linux64.tar.gz | tar -xzv -C /opt/ctffind
+    dnf install -y wxGTK3-devel
+
+    # -------------------------
+    # Install ResMap
+    # -------------------------
+    mkdir -p /opt/resmap
+    curl -L "https://sourceforge.net/projects/resmap/files/ResMap-1.1.4-linux64/download" -o "/opt/resmap/ResMap-1.1.4-linux64"
+    chmod +x /opt/resmap/ResMap-1.1.4-linux64
+
+    # -------------------------
+    # Install MotionCor2
+    # -------------------------
+    # 1. copy file from research storage
+    mkdir -p /opt/MotionCor2
+    cp /opt/MotionCor2_1.6.4_Mar31_2023.zip /opt/MotionCor2/
+    # 2. unizip to install folder
+    unzip /opt/MotionCor2/MotionCor2_1.6.4_Mar31_2023.zip -d /opt/MotionCor2/
+    # change permission to execute
+    chmod +x /opt/MotionCor2/MotionCor2_1.6.4_Cuda*
+
+    # -------------------------
+    # Install model-angelo
+    # -------------------------
+    # pin commit hash for reproducibility
+    MODELANGELO_COMMIT=994945bdfa6e5368e0d62349a47792f4864eebc3
+    cd /opt/
+    git clone https://github.com/3dem/model-angelo.git
+    cd model-angelo
+    git checkout "$MODELANGELO_COMMIT"
+    # source install_script.sh
+    conda activate relion-base-5.0_env
+    python -m pip install .
+    
+    # -------------------------
+    # Install AreTomo2 v1.1.2
+    # -------------------------
+    mkdir -p /opt/aretomo2
+    curl -L "https://github.com/czimaginginstitute/AreTomo2/releases/download/v1.1.2/AreTomo2_1.1.2_03-27-2024.zip" -o "/opt/aretomo2/AreTomo2_1.1.2_03-27-2024.zip"
+    cd /opt/aretomo2
+    unzip /opt/aretomo2/AreTomo2_1.1.2_03-27-2024.zip
+    chmod +x AreTomo2_1.1.2_Cuda1*
+    
+    # -------------------------
+    # Install imod v5.1.10
+    # -------------------------
+    mkdir -p /opt/imod
+    cd /opt/imod
+    curl --cacert /opt/imod-ca-cert.crt -L -O https://bio3d.colorado.edu/imod/AMD64-RHEL5/imod_{{ IMOD_VERSION }}_RHEL8-64_CUDA12.0.sh
+    sh imod_{{ IMOD_VERSION }}_RHEL8-64_CUDA12.0.sh -yes -dir /opt/imod
+    # install Java for Etomo
+    dnf install -y java-latest-openjdk
+    # postinstallation setup
+    chmod +x /opt/imod/IMOD/IMOD-linux.sh
+    /opt/imod/IMOD/IMOD-linux.sh
+    
+    # -------------------------
+    # Install cryoCARE
+    # -------------------------
+    # apparently cryocare has a conflict dependedncie with the existing relion environment.
+    # python -m pip install cryocare==0.3.0
+
+    
+    # -------------------------
+    # Add execution permition to launcher
+    # -------------------------
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Add the folder selection
+    # -------------------------
+    dnf install -y zenity
+
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-$(uname)-$(uname -m).sh
+    conda clean --all -y
+    rm -rf /opt/MotionCor2/MotionCor2_1.6.4_Mar31_2023.zip
+    rm -rf /opt/ctffind/ctffind-4.1.14-linux64.tar.gz
+
+%environment
+
+    # set global environment variables for relion and tools
+    export PATH="/opt/relion/build/bin:$PATH"
+    export PATH="/usr/lib64/openmpi/bin:$PATH"
+    # export PATH="/opt/conda/envs/relion-base-5.0_env/bin/cryocare:$PATH"
+    
+    # The default scratch directory in the GUI
+    export RELION_SCRATCH_DIR=$TMPDIR
+    # Default CTFFIND-4.1+ executable
+    export RELION_CTFFIND_EXECUTABLE=/opt/ctffind/bin/ctffind
+    # Default ResMap executable
+    export RELION_RESMAP_EXECUTABLE=/opt/resmap/ResMap-1.1.4-linux64
+    # Default MotionCor2 executable
+    export RELION_MOTIONCOR2_EXECUTABLE=/opt/MotionCor2/MotionCor2_1.6.4_Cuda121_Mar312023
+    # Default pdf viewer for relion gui
+    export RELION_PDFVIEWER_EXECUTABLE=/usr/bin/evince
+    # Default AreTomo2 executable
+    export RELION_ARETOMO2_EXECUTABLE=/opt/aretomo2/AreTomo2_1.1.2_Cuda121
+    # Default imod executable
+    export RELION_ARETOMO_EXECUTABLE=/opt/imod/imod_5.1.10/bin/batchruntomo
+
+    
+    export TORCH_HOME=$HOME/.vibe/.torch/models
+
+%files
+    launchers/* /opt/launchers/
+    files/relion-base-5.0_env.yml /opt/relion-base-5.0_env.yml
+    /storage/research/dsl_vibe_rs/private/applications/relion/MotionCor2_1.6.4_Mar31_2023.zip /opt/MotionCor2_1.6.4_Mar31_2023.zip
+    files/imod-ca-cert.crt /opt/
+
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_relion.sh "$@"

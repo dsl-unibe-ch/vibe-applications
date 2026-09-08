@@ -1,0 +1,105 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application qupath 
+    Category segmentation
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget unzip hostname
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    
+    # install java
+    dnf install -y xz tar java-21-openjdk
+    
+    # install cuda 12.4 for instanseg-djl 
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+    dnf -y install cuda-toolkit-12-4
+
+    # -------------------------
+    # Python tooling
+    # -------------------------
+    
+    # install miniforge in /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    # download QuPath
+    wget -P /opt "https://github.com/qupath/qupath/releases/download/v0.6.0/QuPath-v0.6.0-Linux.tar.xz"
+    tar -xf /opt/QuPath-v0.6.0-Linux.tar.xz -C /opt
+    chmod u+x /opt/QuPath/bin/QuPath
+    
+    # Download extensions and models from BIOP's zenodo
+    mkdir -p /opt/QuPath/QuPath_Common_Data_0.6
+    wget -q  https://zenodo.org/records/17667802/files/QuPath_Common_Data_0.6.zip?download=1 -O /opt/QuPath_Common_Data_0.6.zip
+    unzip /opt/QuPath_Common_Data_0.6.zip -d /opt/QuPath/QuPath_Common_Data_0.6 \
+    && rm /opt/QuPath_Common_Data_0.6.zip 
+    
+    # launch QuPath to set preferences via the qp_prefs.xml file e.g. to set the
+    # extensions folder to QuPath_Common_Data_0.6
+    /opt/QuPath/bin/QuPath script '/opt/QuPath_setPaths.groovy'
+    
+    # Set env vars so conda pretends CUDA is available
+    export CONDA_OVERRIDE_CUDA=12.4
+
+    # create conda environments
+    conda env create -f /opt/instanseg_env.yml
+    conda env create -f /opt/cellpose_env.yml
+    conda env create -f /opt/cellpose3_env.yml
+    conda env create -f /opt/omnipose_env.yml
+    conda env create -f /opt/spotiflow_env.yml
+    
+    # execute rights for launchers
+    for file in /opt/launchers/*; do chmod +x $file; done
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -f /opt/VirtualGL-*.rpm
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-${MINIFORGE_VERSION}-$(uname)-$(uname -m).sh
+    conda clean --all -y
+    rm -f /opt/QuPath-v0.6.0-Linux.tar.xz
+
+%environment
+    export SPOTIFLOW_CACHE_DIR=$HOME/.vibe/.spotiflow/models
+    export CELLPOSE_LOCAL_MODELS_PATH=$HOME/.vibe/.cellpose/models
+
+%files
+    files/*.yml /opt/
+    files/QuPath_setPaths.groovy /opt/QuPath_setPaths.groovy
+    files/qp_prefs.xml /opt/qp_prefs.xml
+    launchers/* /opt/launchers/
+    
+
+%runscript
+    . /opt/launchers/start_qupath.sh "$@"

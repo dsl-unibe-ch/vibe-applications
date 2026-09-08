@@ -1,0 +1,52 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application vscode 
+    Category coding
+    Area science
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    wget -O /opt/code.rpm https://packages.microsoft.com/yumrepos/vscode/Packages/c/code-1.130.0-1784734628.el8.x86_64.rpm
+    dnf install -y /opt/code.rpm
+
+    # execute rights for launchers
+    for file in /opt/launchers/*; do chmod +x $file; done
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    rm -f /opt/code.rpm
+
+%files
+    launchers/* /opt/launchers/
+
+%runscript
+    /opt/launchers/start_vscode.sh "$@"

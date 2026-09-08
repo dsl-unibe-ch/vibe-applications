@@ -1,0 +1,209 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application coot cli
+    Category image-processing cryoEM
+    Area biology
+    Default true
+
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget hostname
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # Installing dependencies for coot
+    dnf -y install \
+        gcc gcc-c++ gcc-gfortran make sed patch m4 flex bison \
+        autoconf automake libtool cmake git rsync tar gzip bzip2 bzip2-devel unzip \
+        which findutils diffutils perl \
+        python3 python3-devel python3-pip \
+        openssl-devel ncurses-devel libjpeg-turbo-devel \
+        gtk4-devel mesa-libGL-devel mesa-libGLU-devel libXext-devel libX11-devel \
+        blas-devel lapack-devel elfutils-devel libvorbis-devel \
+        pkgconf-pkg-config sqlite-devel swig libXt-devel libffi-devel libepoxy-devel gtk-doc
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    # -----------------------------------------------------------------
+    # Environment build-it-3-3 expects a wrapper to define
+    # -----------------------------------------------------------------
+    export AUTOBUILD_INSTALLED=/opt/coot/install
+    export AUTOBUILD_BUILD=/opt/coot/build/autobuild
+    export LOGS=/storage/homefs/rl18y689/ViBe/playground/repos/vibe-applications-dev/coot/coot-base-1.3.1/temp/logs
+    mkdir -p "$AUTOBUILD_BUILD" "$LOGS"
+
+    export build_coot_prerelease=0     # 0/false = build latest *stable* release
+    export run_tests=false             # greg/python test suite needs CCP4 + test data - skip
+    export run_second_test=false
+    export do_nightlies=0              # skip authors own tar/publish infra
+    export TEE_STDOUT=1                # show build output instead of silent redirect
+    export use_sqlite=yes
+    export CHAPI_ONLY=false            # set true instead for a headless (no-GTK) build
+
+    # -----------------------------------------------------------------
+    # Fetch the upstream build script
+    # -----------------------------------------------------------------
+    mkdir -p /opt/coot/build/autobuild
+    mkdir -p /opt/coot/install
+    cd /opt/coot/build
+    wget -O build-it-3-3 https://raw.githubusercontent.com/pemsley/coot/main/build-it-3-3
+    chmod +x build-it-3-3
+
+    # ===================================================================
+    # PATCHES
+    # All diagnostic `grep` calls are followed by `|| true` so that a
+    # zero-match result (e.g. upstream script changes, or a patch that
+    # was already applied) can NEVER silently abort %post before the
+    # real fix (the `sed`) gets a chance to run. This bit us once
+    # already - a `grep` with 0 matches exits 1, and an unguarded
+    # non-zero exit anywhere in %post kills the entire build instantly.
+    # ===================================================================
+
+    # -------------------------------------------------------------
+    # PATCH 1: readline needs the TERMCAP_LIB sed fix on RHEL-family
+    # distros too (script only lists arch/almalinux/ubuntu/debian).
+    # Without it, libreadline.so.8 is missing the UP/BC/PC termcap
+    # symbols -> "undefined symbol: UP" at runtime -> readline fails
+    # Python's own post-build import self-test -> triggers a parallel
+    # `make install` race that can silently drop other modules
+    # (e.g. _ctypes) from being installed.
+    # -------------------------------------------------------------
+    echo "--- before readline patch ---"
+    grep -n 'do_the_sed=yes' build-it-3-3 || true
+    sed -i 's|if \[ "\$dist_name" = almalinux \] ; then do_the_sed=yes ; fi|if [ "$dist_name" = almalinux ] ; then do_the_sed=yes ; fi\nif [ "$dist_name" = rocky     ] ; then do_the_sed=yes ; fi\nif [ "$dist_name" = rhel      ] ; then do_the_sed=yes ; fi\nif [ "$dist_name" = centos    ] ; then do_the_sed=yes ; fi|' build-it-3-3
+    echo "--- after readline patch ---"
+    grep -n 'do_the_sed=yes' build-it-3-3 || true
+
+    # -------------------------------------------------------------
+    # PATCH 2: Python's LDFLAGS only bakes /lib into the rpath, but
+    # our libffi (and other deps) land in /lib64, so Python's
+    # from-source build compiles _ctypes.so fine but it can't be
+    # dlopen'd -> "ModuleNotFoundError: No module named '_ctypes'".
+    # -------------------------------------------------------------
+    echo "--- before rpath patch ---"
+    grep -n 'rpath=${AUTOBUILD_INSTALLED}' build-it-3-3 || true
+    sed -i 's|--rpath=${AUTOBUILD_INSTALLED}/lib"|--rpath=${AUTOBUILD_INSTALLED}/lib:${AUTOBUILD_INSTALLED}/lib64"|g' build-it-3-3
+    echo "--- after rpath patch ---"
+    grep -n 'rpath=${AUTOBUILD_INSTALLED}' build-it-3-3 || true
+
+    # -------------------------------------------------------------
+    # PATCH 3: GSL's ./configure is called with LIBS="-lgslcblas -lm"
+    # but libgslcblas doesn't exist yet (it's built later, in the
+    # same GSL source tree) -> autoconf's very first "can the C
+    # compiler link anything" sanity check fails -> misleading
+    # "C compiler cannot create executables" error.
+    # -------------------------------------------------------------
+    echo "--- before gsl patch ---"
+    grep -n 'gslcblas' build-it-3-3 || true
+    sed -i 's|\./configure \$generic_prefix LIBS="-lgslcblas -lm"|./configure $generic_prefix|' build-it-3-3
+    echo "--- after gsl patch ---"
+    grep -n '\./configure \$generic_prefix$' build-it-3-3 || true
+
+    # -------------------------------------------------------------
+    # PATCH 4: same class of bug as GSL, for RDKit's cmake step.
+    # The script force-sets LDFLAGS="-L$install_top_dir/lib -lintl"
+    # on every distro except debian/ubuntu/almalinux/arch. -lintl
+    # (GNU gettext) is never built on Linux (only needed on macOS -
+    # glibc provides gettext natively), so cmake's compiler sanity
+    # check fails with "ld: cannot find -lintl". Add rocky/rhel/
+    # centos/fedora to the exclusion list.
+    # -------------------------------------------------------------
+    echo "--- before lintl patch ---"
+    grep -n 'lintl' build-it-3-3 || true
+    sed -i 's|export LDFLAGS="-L\$install_top_dir/lib -lintl"|if test "$dist_name" = rocky -o "$dist_name" = rhel -o "$dist_name" = centos -o "$dist_name" = fedora ; then\n                     echo don.t mess with LDFLAGS here on $dist_name\n                  else\n                     export LDFLAGS="-L$install_top_dir/lib -lintl"\n                  fi|' build-it-3-3
+    echo "--- after lintl patch ---"
+    grep -n 'lintl\|mess with LDFLAGS' build-it-3-3 || true
+
+    # -------------------------------------------------------------
+    # PATCH 5: pygobject 3.52.3's meson build defaults -Dtests=true,
+    # which pulls in a "gobject-introspection-tests" subproject that
+    # needs the legacy "gobject-introspection-1.0" pkg-config name
+    # (distinct from "girepository-2.0", which resolves fine via a
+    # bundled fallback). We don't need pygobject's own test suite -
+    # disable it so meson setup doesn't fail on this unrelated
+    # dependency.
+    # -------------------------------------------------------------
+    echo "--- before pygobject-tests patch ---"
+    grep -n 'meson setup -Dprefix=\$install_top_dir build' build-it-3-3 || true
+    sed -i 's|meson setup -Dprefix=\$install_top_dir build|meson setup -Dprefix=$install_top_dir -Dtests=false build|' build-it-3-3
+    echo "--- after pygobject-tests patch ---"
+    grep -n 'Dtests=false' build-it-3-3 || true
+
+    # -------------------------------------------------------------
+    # PATCH 6: pygobject's meson fallback build vendors its own
+    # private copy of glib/gio/gobject/gmodule under $install_top_dir
+    # (because Rocky 9's system glib is too old to provide the
+    # girepository-2.0 API pygobject 3.52.3 needs). That vendored
+    # libgio-2.0.so needs g_module_open_full from libgmodule-2.0,
+    # but nothing in Coot's own build passes -lgmodule-2.0 on the
+    # final link line -> "undefined reference to `g_module_open_full'"
+    # when linking layla-bin (and later the main coot binary too).
+    # Inject LIBS="-lgmodule-2.0" into Coot's own ./configure so
+    # Automake's default link rule adds it for every binary.
+    # -------------------------------------------------------------
+    echo "--- before gmodule patch ---"
+    grep -n -- '--with-guile \\' build-it-3-3 || true
+    sed -i 's|--with-guile \\|--with-guile \\\n      LIBS="-lgmodule-2.0" \\|g' build-it-3-3
+    echo "--- after gmodule patch ---"
+    grep -n -- 'lgmodule' build-it-3-3 || true
+
+    # run the install script
+    bash build-it-3-3
+
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+
+%environment
+    export LC_ALL=C
+    export COOT_PREFIX=/opt/coot
+    export PATH=/opt/coot/install/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/coot/install/lib:/opt/coot/install/lib64:$LD_LIBRARY_PATH
+    export PYTHONHOME=/opt/coot/install
+
+%files
+    launchers/* /opt/launchers/
+    tests/* /opt/tests/
+    /storage/homefs/rl18y689/ViBe/playground/repos/vibe-applications-dev/coot/coot-base-1.3.1/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_coot.sh "$@"

@@ -1,0 +1,5 @@
+name: relion-base-5.0_env
+channels:
+  - conda-forge
+dependencies:
+  - pip

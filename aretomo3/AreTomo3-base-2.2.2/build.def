@@ -1,0 +1,85 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application AreTomo3 
+    Category image-processing
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+    # cuda installation for aretomo3
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+    dnf -y install cuda-toolkit-12-8
+    # dependencies for aretomo3
+    dnf install -y git make gcc gcc-c++ libtiff-devel
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    cd /opt
+    # pin commit hash for reproducibility
+    ARETOMO3_COMMIT=05fd7ddada7dea57a2445e654321896cdd5151ee
+    git clone https://github.com/czimaginginstitute/AreTomo3.git
+    cd /opt/AreTomo3
+    git checkout "$ARETOMO3_COMMIT"
+
+    # Patch makefile before compiling
+    sed -i '/\.\/MotionCor\/MrcUtil\/CApplyRefs.cpp \\/a\ ./MotionCor/MrcUtil/CLoadMrcMain.cpp \\' makefile11
+    sed -i 's|-L$(CUDALIB)/stubs\\|-L$(CUDALIB)/stubs \\|' makefile11
+
+    make exe -f makefile11 CUDAHOME=/usr/local/cuda-12.8/
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+
+
+%files
+    launchers/* /opt/launchers/
+
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%environment
+    export PATH=/opt/AreTomo3/:$PATH
+
+%runscript
+    /opt/launchers/start_AreTomo3.sh "$@"

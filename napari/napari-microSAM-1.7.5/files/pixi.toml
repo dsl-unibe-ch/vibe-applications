@@ -1,0 +1,26 @@
+[workspace]
+authors = ["UniBE VIBE project"]
+channels = ["conda-forge"]
+name = "napari-microsam-default"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+
+[environments]
+napari-microsam-default = { features = ["napari-microsam-default"], no-default-feature = true }
+
+[feature.napari-microsam-default.dependencies]
+micro_sam = "==1.7.5"
+napari = "==0.6.6"
+python = "==3.13.13"
+jupyterlab = "*"
+
+[feature.napari-microsam-default.pypi-dependencies]
+trackastra = "*"
+mobile-sam = { git = "https://github.com/ChaoningZhang/MobileSAM.git"}
+
+[feature.napari-microsam-default.system-requirements]
+cuda = "13.0"
