@@ -1,4 +1,4 @@
-# napari-stardist-2024.8.6.1_1
+# napari-stardist-2024.8.6.1v2
 
 StarDist is a deep learning-based image segmentation method that can be used as a plugin in napari, a multi-dimensional image viewer for Python. StarDist is designed to segment star-convex (roundish) objects in images, such as cells or nuclei, and is particularly useful for biological image analysis. For more information see the [StarDist GitHub repository](https://github.com/stardist/stardist).
 
@@ -14,7 +14,7 @@ Please refer to the [VIBE documentation](https://dsl-unibe-ch.github.io/vibe-doc
 To build the container, run the following command in the terminal:
 
 ```bash
-apptainer build napari-stardist-2024.8.6.1_1.sif build.def
+apptainer build napari-stardist-2024.8.6.1v2.sif build.def
 ```
 
 ## Run Instructions
@@ -22,5 +22,5 @@ apptainer build napari-stardist-2024.8.6.1_1.sif build.def
 This container runs by default napari with:
 
 ```bash
-apptainer run --nv napari-stardist-2024.8.6.1_1.sif
+apptainer run --nv napari-stardist-2024.8.6.1v2.sif
 ```
