@@ -1,4 +1,4 @@
 #!/bin/bash
-. /opt/conda/etc/profile.d/conda.sh
-conda activate napari-microSAM_env
+
+eval "$(/opt/pixi shell-hook -e napari-microsam-default --manifest-path /opt)"
 vglrun -d egl python "$@"

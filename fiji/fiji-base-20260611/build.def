@@ -1,0 +1,230 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application fiji 
+    Category image-processing
+    Area biology
+    Default true
+
+%post
+    set -ex
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+    # The following libraries are required for Fiji
+    dnf install -y libXrender fontconfig
+    dnf install -y unzip tar bzip2
+    dnf install -y hostname
+    # required for clij2
+    dnf install -y ocl-icd-devel
+
+    # ensure openCL drivers are found for 3Dscript
+    mkdir -p /etc/OpenCL/vendors
+    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+
+    # -------------------------
+    # Python tooling
+    # -------------------------
+    
+    # install miniforge in /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    # Install Fiji
+    cd /opt
+    wget https://downloads.imagej.net/fiji/latest/fiji-latest-linux64-jdk.zip
+    unzip fiji-latest-linux64-jdk.zip -d /opt/
+
+    #### Install micromamba and create relevant environments for SAMJ ####
+    # Create the install directory
+    mkdir -p /opt/Fiji/appose_x86_64
+
+    # Download and extract micromamba directly into the target directory
+    curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
+        | tar -xvj -C /opt/Fiji/appose_x86_64
+
+    export MAMBA_ROOT_PREFIX=/opt/Fiji/appose_x86_64
+    
+    /opt/Fiji/appose_x86_64/bin/micromamba create -p /opt/Fiji/appose_x86_64/envs/sam2 -c conda-forge python=3.11 -c pytorch scikit-image pytorch=2.4.0 torchvision=0.19.0 --yes
+    /opt/Fiji/appose_x86_64/bin/micromamba run -n sam2 pip install samv2==0.0.4 pytest
+
+    # Download weights to appose_x86_64/envs/sam2/weights
+    wget -P /opt/Fiji/appose_x86_64/envs/sam2/sam2/weights https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt
+    wget -P /opt/Fiji/appose_x86_64/envs/sam2/sam2/weights https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_small.pt
+    wget -P /opt/Fiji/appose_x86_64/envs/sam2/sam2/weights https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_large.pt
+
+    # Create the environment for efficient_sam
+    /opt/Fiji/appose_x86_64/bin/micromamba create -p /opt/Fiji/appose_x86_64/envs/efficient_sam_env -c conda-forge python=3.11 -c pytorch libpng libjpeg-turbo scikit-image pytorch=2.4.0 torchvision=0.19.0 cpuonly --yes
+    /opt/Fiji/appose_x86_64/bin/micromamba run -n efficient_sam_env pip install appose
+
+    # Create the environment for efficient_vit_sam
+    /opt/Fiji/appose_x86_64/bin/micromamba create -p /opt/Fiji/appose_x86_64/envs/efficientvit_sam_env -c conda-forge python=3.11 -c pytorch libpng libjpeg-turbo scikit-image pytorch=2.4.0 torchvision=0.19.0 cpuonly cmake onnx onnxruntime timm=0.6.13 --yes
+    /opt/Fiji/appose_x86_64/bin/micromamba run -n efficientvit_sam_env pip install appose onnxsim segment_anything
+    
+    ##### Add plugins #####
+    # Update Fiji and add plugins
+    /opt/Fiji/fiji-linux-x64 --headless --update update
+    # Add the update sites for the plugins we want to include in the image.
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site IJPB-plugins http://sites.imagej.net/IJPB-plugins/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site 3Dscript https://romulus.oice.uni-erlangen.de/updatesite/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "3D ImageJ Suite" https://sites.imagej.net/Tboudier/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "clij" https://sites.imagej.net/clij/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "clij2" https://sites.imagej.net/clij2/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "MoBIE" https://sites.imagej.net/MoBIE/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "PTBIOP" https://biop.epfl.ch/Fiji-Update/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "SAMJ" https://sites.imagej.net/SAMJ/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site "Labkit" https://sites.imagej.net/Labkit/
+    /opt/Fiji/fiji-linux-x64 --headless --update update
+
+    #### Finish SAMJ install. The plugin requires the appose package. It works specifically with the version
+    #### present in dl-modelrunner. So this installation steps has to happen after the update of Fiji and installation of the SAMJ plugin.
+    #### Also efficient models need to be unzipped into the correct envs from the SAMJ jar.
+    DLMR_JAR=$(ls /opt/Fiji/jars/dl-modelrunner-*.jar | head -n1)
+    SAMJ_LIB_JAR=$(ls /opt/Fiji/jars/samj-[0-9]*.jar | head -n1)
+
+    mkdir -p /tmp/samj-extract && cd /tmp/samj-extract
+
+    # legacy appose into every env
+    unzip -p "$DLMR_JAR" appose-python.zip > appose-python.zip
+    unzip -q appose-python.zip            # -> ./appose-python/
+    for ENV in sam2 efficient_sam_env efficientvit_sam_env; do
+        /opt/Fiji/appose_x86_64/bin/micromamba run -n "$ENV" \
+            pip install --no-deps /tmp/samj-extract/appose-python
+    done
+
+    # EfficientSAM python package (creates envs/efficient_sam_env/EfficientSAM/...)
+    unzip -p "$SAMJ_LIB_JAR" EfficientSAM.zip > EfficientSAM.zip
+    unzip -q -o EfficientSAM.zip -d /opt/Fiji/appose_x86_64/envs/efficient_sam_env/
+
+    # EfficientViT python package (creates envs/efficientvit_sam_env/efficientvit/...)
+    unzip -p "$SAMJ_LIB_JAR" efficientvit.zip > efficientvit.zip
+    unzip -q -o efficientvit.zip -d /opt/Fiji/appose_x86_64/envs/efficientvit_sam_env/
+
+    cd /opt && rm -rf /tmp/samj-extract
+
+    # EfficientSAM: URL serves a zip containing the .pt; we must unzip it.
+    mkdir -p /opt/Fiji/appose_x86_64/envs/efficient_sam_env/EfficientSAM/weights
+    cd /tmp
+    wget https://raw.githubusercontent.com/yformer/EfficientSAM/main/weights/efficient_sam_vits.pt.zip
+    unzip -o efficient_sam_vits.pt.zip \
+        -d /opt/Fiji/appose_x86_64/envs/efficient_sam_env/EfficientSAM/weights
+    rm efficient_sam_vits.pt.zip
+
+    # EfficientViTSAM
+    mkdir -p /opt/Fiji/appose_x86_64/envs/efficientvit_sam_env/efficientvit/weights
+    for V in l0 l1 l2; do
+        wget -P /opt/Fiji/appose_x86_64/envs/efficientvit_sam_env/efficientvit/weights \
+            "https://huggingface.co/mit-han-lab/efficientvit-sam/resolve/main/efficientvit_sam_${V}.pt"
+    done
+
+
+    #### Create environments for cellpose, stardist and spotiflow run through PTBIOP
+    # Set env vars so conda pretends CUDA is available
+    export CONDA_OVERRIDE_CUDA=12.4
+
+    # create conda environments
+    conda env create -f /opt/cellpose_env_strict.yml
+    conda env create -f /opt/cellpose3_env_strict.yml
+    conda env create -f /opt/spotiflow_env_strict.yml
+    conda env create -f /opt/stardist_env_strict.yml
+
+    export CELLPOSE_LOCAL_MODELS_PATH=/opt/cellpose_models
+    export SPOTIFLOW_CACHE_DIR=/opt/spotiflow_models
+    mkdir -p "$CELLPOSE_LOCAL_MODELS_PATH" "$SPOTIFLOW_CACHE_DIR"
+
+    # Get cellpose models by running minimal python scripts
+    conda activate cellpose3_env
+    python /opt/download_models_cp3.py
+
+    # Extra cellpose size model(s) not fetched by download_models_cp3.py
+    WGET_LIST="size_cyto3.npy"
+    for w in $WGET_LIST; do
+        url="https://www.cellpose.org/models/${w}"
+        echo "$url"
+        wget -P /opt/cellpose_models/ "$url"
+    done
+
+    conda deactivate
+
+    # Get cellposeSAM model by running minimal python scripts
+    conda activate cellpose_env
+    export LD_LIBRARY_PATH=/opt/conda/envs/cellpose_env/lib:$LD_LIBRARY_PATH
+    python /opt/download_models_cpsam.py
+    conda deactivate
+
+    # Get stardist models by running minimal python scripts
+    conda activate stardist_env
+    python /opt/download_models_stardist.py
+    conda deactivate
+
+    # Get spotiflow models by running minimal python scripts
+    conda activate spotiflow_env
+    python /opt/download_models_spotiflow.py
+    conda deactivate
+
+    # Make the launcher executable
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # execute rights for launchers
+    for file in /opt/launchers/*; do chmod +x $file; done
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -f /opt/VirtualGL-*.rpm
+    dnf clean all
+    rm /opt/fiji-latest-linux64-jdk.zip
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-$(uname)-$(uname -m).sh
+    conda clean --all -y
+
+%environment
+    FIJIPATH=/opt/Fiji
+    export PATH=$FIJIPATH:$PATH
+    export OCL_ICD_VENDORS=/etc/OpenCL/vendors
+    export SPOTIFLOW_CACHE_DIR=/opt/spotiflow_models
+    export CELLPOSE_LOCAL_MODELS_PATH=/opt/cellpose_models
+    export LD_LIBRARY_PATH=/opt/conda/envs/cellpose_env/lib:$LD_LIBRARY_PATH
+
+%files
+    files/*.yml /opt/
+    files/download_models*.py /opt/
+    launchers/* /opt/launchers/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_fiji.sh "$@"

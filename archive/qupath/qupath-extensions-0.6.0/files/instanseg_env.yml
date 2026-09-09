@@ -1,0 +1,6 @@
+name: instanseg_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pytorch-gpu=2.5.1

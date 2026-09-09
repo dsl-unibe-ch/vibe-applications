@@ -1,0 +1,16 @@
+[workspace]
+authors = ["Guillaume Witz <guillaume.witz@unibe.ch>"]
+channels = ["conda-forge"]
+name = "cellpose-v3gui-3.1.1.3_1"
+platforms = [{ platform = "linux-64", cuda = "12" }]
+version = "0.1.0"
+
+[environments]
+cellpose-v3gui-default = ["cellpose-v3gui-default"]
+
+[feature.cellpose-v3gui-default.dependencies]
+python = "3.11.*"
+jupyterlab = "==4.6.1"
+
+[feature.cellpose-v3gui-default.pypi-dependencies]
+cellpose = { version = "==3.1.1.3", extras = ["gui"] }

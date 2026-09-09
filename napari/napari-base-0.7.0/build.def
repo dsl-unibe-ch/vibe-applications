@@ -2,10 +2,10 @@ Bootstrap: docker
 From: rockylinux/rockylinux:9-minimal
 
 %labels
-    Application napari jupyterlab
-    Category segmentation
+    Application napari jupyterlab python
+    Category image-processing
     Area biology
-    Default true
+    Default true 
 
 %post
 
@@ -18,20 +18,16 @@ From: rockylinux/rockylinux:9-minimal
     dnf install -y dnf-plugins-core
     dnf install -y epel-release
     dnf config-manager --set-enabled crb
-
-    dnf install -y bash wget
-    
+    dnf install -y bash wget hostname
     VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
     wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
     dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
-    #   GIT needed for MobileSAM repo installation
-    dnf install -y git
 
     # -------------------------
     # Optional dnf
     # -------------------------
-    dnf install -y hostname
 
+    
     # -------------------------
     # Python tooling
     # -------------------------
@@ -44,10 +40,9 @@ From: rockylinux/rockylinux:9-minimal
     # Application creation
     # -------------------------
 
-    export CONDA_OVERRIDE_CUDA=13
     pixi install --all --frozen --manifest-path /opt
 
-    # execute rights for launchers and test files
+    # exexcute rights for launchers
     chmod +x /opt/launchers/start_*.sh
     chmod +x /opt/tests/test_*.sh
 
@@ -60,13 +55,13 @@ From: rockylinux/rockylinux:9-minimal
     rm -f /var/log/dnf*
     dnf clean all
     rm -f /opt/VirtualGL-*.rpm
-
-    # remove pixi cache
+    
+    # remove conda cache
     pixi clean cache -y
 
 %files
-    launchers/* /opt/launchers/
     files/pixi* /opt/
+    launchers/* /opt/launchers/
     tests/* /opt/tests/
 
 %test
@@ -74,9 +69,6 @@ From: rockylinux/rockylinux:9-minimal
 
 %arguments
   test_command="true"
-
-%environment
-    export PATH="/opt/:$PATH"
 
 %runscript
     /opt/launchers/start_napari.sh "$@"
