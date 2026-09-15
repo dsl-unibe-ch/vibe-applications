@@ -1,0 +1,82 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application cellpose jupyterlab python
+    Category segmentation
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget hostname
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+    # Dependencies for cellpose gui
+    dnf -y install fontconfig libxkbcommon-x11 xcb-util-cursor xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    
+    
+    # -------------------------
+    # Python tooling
+    # -------------------------
+
+    # install miniforge in /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    export CONDA_OVERRIDE_CUDA=13.0
+    conda env create -f /opt/cellpose-v3gui_env_strict.yml
+    conda activate cellpose-v3gui_env
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-$(uname)-$(uname -m).sh
+    conda clean --all -y
+
+%files
+    launchers/* /opt/launchers/
+    files/*.yml /opt/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_cellpose.sh "$@"

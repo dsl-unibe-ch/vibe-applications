@@ -1,0 +1,9 @@
+name: cellpose-v3gui_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - jupyterlab
+  - pip
+  - pip:
+    - cellpose[gui]==3.1.1.3

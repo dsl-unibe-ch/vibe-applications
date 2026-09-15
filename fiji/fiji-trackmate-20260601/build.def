@@ -1,0 +1,111 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application fiji 
+    Category image-processing
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+    # The following libraries are required for Fiji
+    dnf install -y libXrender fontconfig
+    dnf install -y unzip 
+    dnf install -y hostname
+
+    # -------------------------
+    # Python tooling
+    # -------------------------
+
+    # install miniforge in /opt
+    wget -P /opt "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash /opt/Miniforge3-$(uname)-$(uname -m).sh -b -p /opt/conda
+    
+    # make conda available during build
+    . /opt/conda/etc/profile.d/conda.sh
+    
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    cd /opt
+    wget https://downloads.imagej.net/fiji/latest/fiji-latest-linux64-jdk.zip
+    unzip fiji-latest-linux64-jdk.zip -d /opt/
+    ##### Update fiji #####
+    /opt/Fiji/fiji-linux-x64 --headless --update update
+    ##### Installing plugins sites example #####
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site IJPB-plugins https://sites.imagej.net/IJPB-plugins/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site TrackMate-Cellpose https://sites.imagej.net/TrackMate-Cellpose/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site TrackMate-Trackastra https://sites.imagej.net/TrackMate-Trackastra/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site TrackMate-Spotiflow https://sites.imagej.net/TrackMate-Spotiflow/
+    /opt/Fiji/fiji-linux-x64 --headless --update add-update-site TrackMate-YOLO https://sites.imagej.net/TrackMate-YOLO/
+
+    /opt/Fiji/fiji-linux-x64 --headless --update update
+
+    # install python envs
+    export CONDA_OVERRIDE_CUDA=12.6
+    conda env create -f /opt/cellpose_env.yml
+    conda env create -f /opt/cellpose3_env.yml
+    conda env create -f /opt/omnipose_env.yml
+    conda env create -f /opt/yolo_env.yml
+    conda env create -f /opt/trackastra_env.yml
+    conda env create -f /opt/spotiflow_env.yml
+
+    # Make the launcher executable
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    rm -f /opt/VirtualGL-*.rpm
+    dnf clean all
+    rm /opt/fiji-latest-linux64-jdk.zip
+    rm -rf /root/.cache/pip
+    rm -f /opt/Miniforge3-$(uname)-$(uname -m).sh
+    conda clean --all -y
+
+%environment
+    FIJIPATH=/opt/Fiji
+    export PATH=$FIJIPATH:$PATH
+    export SPOTIFLOW_CACHE_DIR=$HOME/.vibe/.spotiflow/models
+    export CELLPOSE_LOCAL_MODELS_PATH=$HOME/.vibe/.cellpose/models
+    export LD_LIBRARY_PATH=/opt/conda/envs/cellpose_trackM_env/lib:$LD_LIBRARY_PATH
+
+%files
+    launchers/* /opt/launchers/
+    files/*.yml /opt/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_fiji.sh "$@"

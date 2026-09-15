@@ -1,0 +1,29 @@
+[workspace]
+channels = ["conda-forge"]
+name = "napari-0.7.0"
+platforms = ["linux-64"]
+
+[environments]
+napari-base-default = { features = ["napari-base-default"], no-default-feature = true }
+
+[feature.napari-base-default.dependencies]
+python = "3.13.*"
+pyqt6 = "==6.11.0"
+napari-skimage = "==0.6.0"
+napari-animation = "==0.0.9"
+napari-threedee = "==0.0.29"
+pandas = "==3.0.3"
+seaborn = "==0.13.2"
+napari = "==0.7.0"
+jupyterlab = "*"
+
+[feature.napari-base-default.pypi-dependencies]
+ndevio = "==0.3.3"
+bioio-czi = "==2.7.2"
+bioio-dv = "==1.2.0"
+bioio-nd2 = "==1.7.0"
+bioio-lif = "==1.4.2"
+
+
+[feature.napari-base-default]
+channels = ["conda-forge"]

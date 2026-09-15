@@ -1,0 +1,12 @@
+name: omnipose_qp_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch-gpu=2.4.1
+  - torchvision
+  - pip
+  - pip:
+    - natsort
+    - scipy==1.11.4
+    - omnipose==1.0.6

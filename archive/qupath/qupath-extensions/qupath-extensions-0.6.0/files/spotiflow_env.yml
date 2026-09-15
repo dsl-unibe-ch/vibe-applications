@@ -1,0 +1,9 @@
+name: spotiflow_qp_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pytorch-gpu=2.9.1
+  - pip
+  - pip:
+    - spotiflow

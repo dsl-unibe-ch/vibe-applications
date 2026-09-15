@@ -1,0 +1,127 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application matlab 
+    Category image-processing
+    Area sciences
+    Default true
+
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget hostname
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # install CUDA
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+    dnf -y install cuda-toolkit-12-6
+    
+    # Ensure Vulkan base utilities are in place
+    dnf install -y vulkan-headers vulkan-loader vulkan-tools
+
+    # Force create the NVIDIA Installable Client Driver (ICD) structure
+    mkdir -p /usr/share/vulkan/icd.d
+    cat << 'EOF' > /usr/share/vulkan/icd.d/nvidia_icd.json
+{
+    "file_format_version" : "1.0.0",
+    "ICD": {
+        "library_path": "libGLX_nvidia.so.0",
+        "api_version": "1.4.328"
+    }
+}
+EOF
+
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    # install system dependencies
+    dnf install -y $(curl -sL https://raw.githubusercontent.com/mathworks-ref-arch/container-images/refs/heads/main/matlab-deps/{{ MATLAB_VERSION }}/ubi9/base-dependencies-amd64.txt)
+    mkdir -p /opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers
+    wget -P /opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers https://www.mathworks.com/mpm/glnxa64/mpm
+    wget -P /opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers https://ch.mathworks.com/content/dam/mathworks/mathworks-dot-com/products/mpm/mpm-input-{{ MATLAB_VERSION }}.txt
+
+    # Patch the downloaded mpm input file instead of hand-maintaining a copy:
+    MPM_INPUT_FILE=/opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers/mpm-input-{{ MATLAB_VERSION }}.txt
+
+    # set the MATLAB_VERSION variable for use in the sed commands below, otherwise the sed commands will not work correctly
+    MATLAB_VERSION={{ MATLAB_VERSION }}
+    # 1. Set the install destination to this image's MATLAB_VERSION path
+    #    (replaces the commented "# destinationFolder=" default line).
+    sed -i "s|^# destinationFolder=.*|destinationFolder=/opt/matlab/matlab-base-${MATLAB_VERSION}/|" "$MPM_INPUT_FILE"
+
+    # 2. Accept vendor (third-party) licenses, required for a silent/
+    #    headless install (removes the leading "#" comment marker).
+    sed -i 's/^# acceptVendorLicenses=yes/acceptVendorLicenses=yes/' "$MPM_INPUT_FILE"
+
+    # 3. Enable every core product: within the file section bounded by
+    #    "## PRODUCTS" and "## SUPPORT PACKAGES" only, uncomment every
+    #    "#product.X" line. Scoping to this range deliberately leaves the
+    #    later "SUPPORT PACKAGES" and scene-model sections untouched, so
+    #    those stay disabled.
+    sed -i '/^## PRODUCTS$/,/^## SUPPORT PACKAGES$/ s/^#product\./product./' "$MPM_INPUT_FILE"
+
+    # 4. Exception: re-comment product.Spreadsheet_Link, since step 3
+    #    would otherwise enable it along with the rest of the core block.
+    sed -i 's/^product\.Spreadsheet_Link$/#product.Spreadsheet_Link/' "$MPM_INPUT_FILE"
+
+    chmod +x /opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers/mpm
+    /opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers/mpm install --inputfile="$MPM_INPUT_FILE"
+
+
+  
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+    rm -rfd /opt/matlab/matlab-base-{{ MATLAB_VERSION }}/installers
+
+
+%files
+    launchers/* /opt/launchers/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+  MATLAB_VERSION=r2026a
+
+%environment
+    export PATH=/opt/matlab/matlab-base-{{ MATLAB_VERSION }}/bin:$PATH
+    export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
+    # Tell matlab to use specifically vulkan rendering backend and disable gpu sandboxing to avoid issues with some graphics cards
+    export MW_CEF_STARTUP_OPTIONS="--use-angle=vulkan --disable-gpu-sandbox --no-sandbox --ignore-gpu-blocklist"
+
+%runscript
+    /opt/launchers/start_matlab.sh "$@"

@@ -11,7 +11,6 @@
     "AutofillAddressEnabled": false,
     "AutofillCreditCardEnabled": false,
     "DisableFirefoxAccounts": true,
-    "DisplayMenuBar": true,
     "NewTabPage": false,
     "FirefoxHome": {
       "Search": false,
@@ -52,6 +51,19 @@
       "MoreFromMozilla": false,
       "FirefoxLabs": false,
       "Locked": false
-    }
+    },
+    "ManagedBookmarks": [
+      {
+        "toplevel_name": "VIBE"
+      },
+      {
+        "url": "https://vibe.unibe.ch",
+        "name": "VIBE Homepage"
+      },
+      {
+        "url": "https://dsl-unibe-ch.github.io/vibe-documentation/",
+        "name": "VIBE Documentation"
+      }
+    ]
   }
 }

@@ -1,0 +1,74 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application napari jupyterlab python
+    Category image-processing
+    Area biology
+    Default true 
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+    dnf install -y bash wget hostname
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+
+    
+    # -------------------------
+    # Python tooling
+    # -------------------------
+
+    # install pixi in /opt
+    wget -qO- https://pixi.sh/install.sh | PIXI_BIN_DIR=/opt sh
+    export PATH="/opt/:$PATH"
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    pixi install --all --frozen --manifest-path /opt
+
+    # exexcute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+    
+    # remove conda cache
+    pixi clean cache -y
+
+%files
+    files/pixi* /opt/
+    launchers/* /opt/launchers/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_napari.sh "$@"

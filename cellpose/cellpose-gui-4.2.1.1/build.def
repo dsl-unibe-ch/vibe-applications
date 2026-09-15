@@ -1,0 +1,79 @@
+Bootstrap: docker
+From: rockylinux/rockylinux:9-minimal
+
+%labels
+    Application cellpose jupyterlab
+    Category segmentation
+    Area biology
+    Default true
+
+%post
+
+    # -------------------------
+    # Basic dnf
+    # -------------------------
+    microdnf -y install dnf
+    dnf -y update && dnf -y upgrade
+    dnf install -y dnf-plugins-core
+    dnf install -y epel-release
+    dnf config-manager --set-enabled crb
+
+    dnf install -y bash wget
+    
+    VGL_LATEST=$(curl -ILs -o /dev/null -w %{url_effective} https://github.com/VirtualGL/virtualgl/releases/latest | cut -d '/' -f8)
+    wget -P /opt https://github.com/VirtualGL/virtualgl/releases/download/$VGL_LATEST/VirtualGL-$VGL_LATEST.x86_64.rpm
+    dnf install -y /opt/VirtualGL-$VGL_LATEST.x86_64.rpm
+    # Dependencies for cellpose gui
+    dnf -y install fontconfig libxkbcommon-x11 xcb-util-cursor xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm
+
+    # -------------------------
+    # Optional dnf
+    # -------------------------
+    # Suppress warning tha hostname command missing from VirtualGL
+    dnf -y install hostname
+    
+
+    # install pixi in /opt
+    wget -qO- https://pixi.sh/install.sh | PIXI_BIN_DIR=/opt sh
+    export PATH="/opt/:$PATH"
+
+    # -------------------------
+    # Application creation
+    # -------------------------
+
+    export CONDA_OVERRIDE_CUDA=12.3
+    pixi install --all --frozen --manifest-path /opt
+
+    # execute rights for launchers
+    chmod +x /opt/launchers/start_*.sh
+    chmod +x /opt/tests/test_*.sh
+
+    # -------------------------
+    # Cleanup
+    # -------------------------
+
+    # Cleanup temporary files
+    rm -rf /var/cache/dnf/*
+    rm -f /var/log/dnf*
+    dnf clean all
+    rm -f /opt/VirtualGL-*.rpm
+    
+    # remove pixi cache
+    pixi clean cache -y
+
+%environment
+    export CELLPOSE_LOCAL_MODELS_PATH=$HOME/.vibe/.cellpose/models
+
+%files
+    launchers/* /opt/launchers/
+    files/pixi* /opt/
+    tests/* /opt/tests/
+
+%test
+  {{ test_command }}
+
+%arguments
+  test_command="true"
+
+%runscript
+    /opt/launchers/start_cellpose.sh "$@"
