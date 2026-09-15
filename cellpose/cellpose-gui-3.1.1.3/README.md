@@ -1,4 +1,4 @@
-# cellpose-v3gui-3.1.1.3v2
+# cellpose-gui-3.1.1.3
 
 Cellpose GUI is a graphical user interface for the Cellpose segmentation algorithm. In particular it allows to interactively correct and fine-tune a model for a given dataset. This version specifically gives access to the pre-CellposeSAM models, based on a simpler architecture. Those models are less general than the CellposeSAM models, but they are much smaller and faster for both training and inference. You can find more information about the Cellpose GUI in the [Cellpose documentation](https://cellpose.readthedocs.io/en/latest/gui.html).
 
@@ -12,7 +12,7 @@ Please refer to the [VIBE documentation](https://dsl-unibe-ch.github.io/vibe-doc
 To build the container, run the following command in the terminal:
 
 ```bash
-apptainer build cellpose-v3gui-3.1.1.3v2.sif build.def
+apptainer build cellpose-gui-3.1.1.3.sif build.def
 ```
 
 ## Run Instructions
@@ -20,5 +20,5 @@ apptainer build cellpose-v3gui-3.1.1.3v2.sif build.def
 This container runs by default cellpose with:
 
 ```bash 
-apptainer run --nv cellpose-v3gui-3.1.1.3v2.sif
+apptainer run --nv cellpose-gui-3.1.1.3.sif
 ```
